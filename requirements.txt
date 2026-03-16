@@ -1,0 +1,7 @@
+beautifulsoup4
+feedparser
+matplotlib
+pandas
+requests
+textblob
+wordcloud
