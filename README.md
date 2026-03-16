@@ -1,10 +1,10 @@
-# 📰 News-Sentiment-Pipeline
+# News-Sentiment-Pipeline
 
 > End-to-end Indian news sentiment pipeline: scrapes live headlines from NDTV, Times of India & NewsLive TV via RSS feeds and BeautifulSoup, scores polarity & subjectivity with TextBlob NLP, persists timestamped records in SQLite, and visualizes sentiment distributions and word clouds across sources.
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Pipeline Architecture](#pipeline-architecture)
@@ -136,9 +136,9 @@ TextBlob produces a **polarity score** in the range `[-1.0, +1.0]`. The followin
 
 | Polarity Range | Label |
 |---|---|
-| `polarity > 0.05` | ✅ Positive |
-| `polarity < -0.05` | ❌ Negative |
-| `-0.05 ≤ polarity ≤ 0.05` | ➖ Neutral |
+| `polarity > 0.05` | Positive |
+| `polarity < -0.05` | Negative |
+| `-0.05 ≤ polarity ≤ 0.05` | Neutral |
 
 Thresholds are kept tight (±0.05) because news headlines are factual by nature and tend to cluster near zero.
 
