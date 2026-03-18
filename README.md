@@ -14,6 +14,7 @@
 - [Notebook Structure](#notebook-structure)
 - [Sample Results](#sample-results)
 - [Sentiment Scoring Logic](#sentiment-scoring-logic)
+- [SQLite Storage](#sqlite-storage)
 - [Project Structure](#project-structure)
 - [Future Improvements](#future-improvements)
 
@@ -30,21 +31,21 @@ The entire pipeline runs as a single self-contained Jupyter notebook, designed t
 ## Pipeline Architecture
 
 ```
-┌─────────────────────┐
-│   1. Data Collection │  RSS (feedparser) + HTML Scrape (BeautifulSoup)
-└────────┬────────────┘
-         ▼
-┌─────────────────────┐
+┌──────────────────────┐
+│   1. Data Collection  │  RSS (feedparser) + HTML scrape (BeautifulSoup)
+└─────────┬────────────┘
+          ▼
+┌──────────────────────┐
 │  2. Sentiment Analysis│  TextBlob → polarity score + subjectivity score
-└────────┬────────────┘
-         ▼
-┌─────────────────────┐
-│   3. SQLite Storage  │  Persist records with timestamps
-└────────┬────────────┘
-         ▼
-┌─────────────────────┐
-│   4. Visualizations  │  Bar charts · Polarity histogram · Word cloud
-└─────────────────────┘
+└─────────┬────────────┘
+          ▼
+┌──────────────────────┐
+│   3. SQLite Storage   │  Persist timestamped records — re-runnable, appendable
+└─────────┬────────────┘
+          ▼
+┌──────────────────────┐
+│   4. Visualizations   │  Stacked bar · Polarity histogram · Word cloud
+└──────────────────────┘
 ```
 
 ---
@@ -66,12 +67,12 @@ Up to **20 headlines per source** are collected per run. Duplicate headlines are
 | Library | Purpose |
 |---|---|
 | `feedparser` | Parse RSS/Atom feeds |
-| `requests` + `BeautifulSoup` | HTML scraping |
-| `TextBlob` + `NLTK` | Sentiment analysis (polarity & subjectivity) |
-| `pandas` | Data wrangling |
-| `sqlite3` | Persistent local storage |
-| `matplotlib` | Bar charts and polarity histogram |
-| `wordcloud` | Word cloud generation |
+| `requests` + `BeautifulSoup` | HTML scraping for NewsLive |
+| `TextBlob` + `NLTK` | Sentiment scoring (polarity & subjectivity) |
+| `pandas` | Data wrangling and summary stats |
+| `sqlite3` | Persistent local storage with run history |
+| `matplotlib` | Stacked bar chart and polarity histogram |
+| `wordcloud` | Most frequent headline words |
 
 ---
 
@@ -80,7 +81,7 @@ Up to **20 headlines per source** are collected per run. Duplicate headlines are
 ### Option 1 — Google Colab (Recommended)
 
 1. Open `news_sentiment_pipeline.ipynb` in [Google Colab](https://colab.research.google.com/).
-2. Run all cells (`Runtime → Run all`).
+2. Run all cells — `Runtime → Run all`.
 3. The first cell installs all dependencies automatically.
 
 ### Option 2 — Local
@@ -104,43 +105,89 @@ jupyter notebook news_sentiment_pipeline.ipynb
 
 ## Notebook Structure
 
-| Section | Description |
-|---|---|
-| **0. Setup** | Install packages and download NLTK corpora |
-| **1. Data Collection** | Scrape RSS feeds (NDTV, TOI) and HTML (NewsLive) |
-| **2. Sentiment Analysis** | Apply TextBlob to score each headline |
-| **3. SQLite Storage** | Persist annotated records to `news_sentiment.db` |
-| **4. Visualizations** | Sentiment breakdown, polarity distribution, word cloud |
-| **5. Summary Table** | Per-source stats: avg polarity, avg subjectivity, counts |
+| Cell | Section | Description |
+|---|---|---|
+| 0 | Header | Pipeline overview and data sources |
+| 1 | Setup | Install packages, download NLTK corpora |
+| 2 | Imports | Load all libraries |
+| 3–5 | **1. Data Collection** | Scrape NDTV & TOI via RSS; scrape NewsLive via BeautifulSoup; deduplicate |
+| 6–7 | **2. Sentiment Analysis** | Apply TextBlob polarity & subjectivity; classify each headline |
+| 8–10 | **3. SQLite Storage** | Persist annotated records to `news_sentiment.db`; query latest run |
+| 11–14 | **4. Visualizations** | Stacked sentiment bar, polarity histogram, word cloud |
+| 15 | **5. Summary Table** | Per-source stats: avg polarity, avg subjectivity, sentiment counts |
 
 ---
 
 ## Sample Results
 
-Results from a single run (58 headlines collected):
+Results from a single run — **57 unique headlines** collected (58 raw, 1 duplicate removed):
+
+### Per-Source Breakdown
 
 | Source | Headlines | Avg Polarity | Avg Subjectivity | Positive | Neutral | Negative |
 |---|---|---|---|---|---|---|
-| NDTV | 20 | 0.0436 | 0.2731 | 5 | 12 | 3 |
-| Times of India | 20 | 0.0660 | — | 5 | 13 | 2 |
-| NewsLive | 18 | 0.0329 | 0.2253 | 4 | 11 | 3 |
-| **Total** | **58** | **0.0483** | — | **14** | **36** | **7** |
+| NDTV | 20 | 0.0436 | 0.2253 | 5 | 12 | 3 |
+| Times of India | 20 | 0.0660 | 0.2445 | 5 | 13 | 2 |
+| NewsLive | 17 | 0.0329 | 0.2731 | 4 | 11 | 2 |
+| **Total** | **57** | **0.0483** | — | **14** | **36** | **7** |
 
-As expected, Indian news headlines are predominantly **neutral** in tone — factual reporting naturally skews polarity scores toward zero.
+### Overall Sentiment Distribution
+
+| Sentiment | Count | Share |
+|---|---|---|
+| Neutral | 36 | 63.2% |
+| Positive | 14 | 24.6% |
+| Negative | 7 | 12.3% |
+
+As expected, Indian news headlines are predominantly **neutral** in tone — factual reporting naturally skews polarity scores toward zero. Times of India shows the highest average polarity (0.0660), while NDTV scores lowest (0.0436). All three sources cluster heavily near zero in the polarity histogram.
+
+### Sample Headlines
+
+| Source | Headline | Polarity | Sentiment |
+|---|---|---|---|
+| NDTV | "Military Dictatorship, Clerical Facade": Farewell... | −0.100 | Negative |
+| NDTV | Poll Body Appoints Ex-Bureaucrat Manjeet Singh... | +0.357 | Positive |
+| Times of India | 'Distorted picture of India': MEA slams US report | −0.150 | Negative |
+| Times of India | The invisible arc of power: How ballistic miss... | 0.000 | Neutral |
+| NewsLive | As the Middle East War entered... | 0.000 | Neutral |
 
 ---
 
 ## Sentiment Scoring Logic
 
-TextBlob produces a **polarity score** in the range `[-1.0, +1.0]`. The following thresholds are applied:
+TextBlob produces a **polarity score** in the range `[−1.0, +1.0]`. The following thresholds are applied:
 
 | Polarity Range | Label |
 |---|---|
 | `polarity > 0.05` | Positive |
-| `polarity < -0.05` | Negative |
-| `-0.05 ≤ polarity ≤ 0.05` | Neutral |
+| `polarity < −0.05` | Negative |
+| `−0.05 ≤ polarity ≤ 0.05` | Neutral |
 
-Thresholds are kept tight (±0.05) because news headlines are factual by nature and tend to cluster near zero.
+Thresholds are kept tight (±0.05) because news headlines are factual by nature and tend to cluster near zero. A wider threshold (e.g. ±0.1) would shift more borderline headlines into the neutral bucket.
+
+TextBlob also returns a **subjectivity score** in `[0.0, 1.0]` — 0 = fully objective, 1 = fully subjective. Across all sources, average subjectivity ranges from 0.22 to 0.27, confirming the headlines are largely factual.
+
+---
+
+## SQLite Storage
+
+Results are persisted to `news_sentiment.db` using Python's built-in `sqlite3`. The table schema is:
+
+```sql
+CREATE TABLE IF NOT EXISTS articles (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    headline        TEXT NOT NULL,
+    source          TEXT NOT NULL,
+    polarity        REAL,
+    subjectivity    REAL,
+    sentiment_label TEXT,
+    scraped_at      TEXT
+);
+```
+
+- The table uses `CREATE IF NOT EXISTS` — **the notebook is safely re-runnable**; each run appends a new batch of timestamped records.
+- After 2 runs, the DB contains **114 records** — enabling trend analysis across sessions.
+- A SQL query filters to the latest `scraped_at` timestamp for per-run reporting.
 
 ---
 
@@ -150,7 +197,7 @@ Thresholds are kept tight (±0.05) because news headlines are factual by nature 
 News-Sentiment-Pipeline/
 │
 ├── news_sentiment_pipeline.ipynb   # Main pipeline notebook
-├── news_sentiment.db               # SQLite database (auto-generated on run)
+├── news_sentiment.db               # SQLite database (auto-generated on first run)
 └── README.md
 ```
 
@@ -158,14 +205,19 @@ News-Sentiment-Pipeline/
 
 ## Future Improvements
 
-- [ ] Schedule periodic runs with `cron` or GitHub Actions for time-series tracking
-- [ ] Add more news sources (The Hindu, Indian Express, Hindustan Times)
-- [ ] Replace TextBlob with a fine-tuned BERT model for improved accuracy on news text
-- [ ] Export results to CSV / Google Sheets for further analysis
-- [ ] Build a simple Streamlit dashboard for interactive exploration
+- [ ] Schedule periodic runs with `cron` or GitHub Actions for time-series sentiment tracking
+- [ ] Add more sources: The Hindu, Indian Express, Hindustan Times
+- [ ] Replace TextBlob with a fine-tuned BERT/RoBERTa model for improved accuracy on news text
+- [ ] Add subjectivity breakdown charts alongside polarity visualizations
+- [ ] Export results to CSV or Google Sheets for downstream analysis
+- [ ] Build a Streamlit dashboard for interactive, filterable exploration
 
 ---
 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+---
+
+*Built with Python 3.10 · TextBlob · feedparser · BeautifulSoup · pandas · SQLite · Matplotlib · WordCloud*
